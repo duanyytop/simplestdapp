@@ -20,8 +20,12 @@
             <input id="address" disabled :value="address" />
           </div>
           <div class="row">
-            <label for="balance">Balance (CKB):</label>
+            <label for="balance">Balance without data(CKB):</label>
             <input id="balance" :value="formatCkb(summary.free)" disabled />
+          </div>
+          <div class="row">
+            <label for="balance">Balance (CKB):</label>
+            <input id="balance" :value="formatCkb(summary.capacity)" disabled />
             <a href="https://faucet.nervos.org/" target="_blank">Get More</a>
           </div>
         </div>
@@ -42,9 +46,8 @@
             <div class="cell-header">
               Capacity: {{formatCkb(cell.output.capacity)}}
               <div class="cell-ops">
-                <a href="#" @click.prevent="deleteCell(cell)">Delete</a>
-                &nbsp;&nbsp;
-                <a href="#" @click.prevent="editCell(cell)">Update</a>
+                <button @click.prevent="deleteCell(cell)">Delete</button>
+                <button @click.prevent="editCell(cell)">Update</button>
               </div>
             </div>
             <div class="cell-body">
@@ -60,9 +63,9 @@
           <div>
             <textarea v-model="editData" placeholder="content in hex-string format"></textarea>
           </div>
-          <div>
+          <div class="model-buttons">
             <button @click.prevent="cancelModel()">Cancel</button>
-            <button @click.prevent="submitModel()" style="float:right">Confirm</button>
+            <button @click.prevent="submitModel()">Confirm</button>
           </div>
         </div>
       </div>
@@ -76,9 +79,10 @@ import {
   hexToBytes,
   privateKeyToPublicKey,
   pubkeyToAddress,
-  blake160
+  blake160,
+  getLockScript
 } from "@nervosnetwork/ckb-sdk-utils";
-import CKB from "@nervosnetwork/ckb-sdk-core";
+
 import {
   formatCkb,
   textToHex,
@@ -87,13 +91,8 @@ import {
   getSummary,
   groupCells
 } from "./utils";
-import {
-  RICH_NODE_RPC_URL,
-  MIN_CAPACITY,
-  TRANSACTION_FEE,
-  SECP256K1_BLAKE160_CODE_HASH
-} from "./const";
-import { fetchCells } from "./rpc";
+import { MIN_CAPACITY, TRANSACTION_FEE, Operator } from "./const";
+import { getCells, sendTransaction } from "./rpc";
 
 export default {
   name: "App",
@@ -101,8 +100,7 @@ export default {
     return {
       privateKey: "",
       address: "",
-      lockScript: undefined,
-      lockArgs: undefined,
+      lockScript: {},
       cells: [],
       emptyCells: [],
       filledCells: [],
@@ -112,7 +110,7 @@ export default {
         capacity: 0
       },
       showModel: false,
-      mode: undefined,
+      mode: Operator.Create,
       editData: "",
       loading: false
     };
@@ -122,19 +120,11 @@ export default {
     reload: async function() {
       this.loading = true;
       const publicKey = privateKeyToPublicKey(`0x${this.privateKey}`);
+      const lockArgs = `0x${blake160(publicKey, "hex")}`;
+
       this.address = pubkeyToAddress(publicKey, { prefix: "ckt" });
-      this.lockArgs = `0x${blake160(publicKey, "hex")}`;
-      this.lockScript = {
-        codeHash: SECP256K1_BLAKE160_CODE_HASH,
-        hashType: "type",
-        args: this.lockArgs
-      };
-      try {
-        this.cells = await this.getCells(this.lockArgs);
-      } catch (error) {
-        alert("error:" + error);
-        console.error(error);
-      }
+      this.lockScript = getLockScript(lockArgs);
+      this.cells = await getCells(lockArgs);
       this.loading = false;
       this.summary = getSummary(this.cells);
       const { emptyCells, filledCells } = groupCells(this.cells);
@@ -153,19 +143,19 @@ export default {
     newCell: function() {
       this.showModel = true;
       this.editData = "";
-      this.mode = "create";
+      this.mode = Operator.Create;
       this.currentCell = null;
     },
 
     editCell: function(cell) {
       this.showModel = true;
       this.editData = hexToText(cell.output_data);
-      this.mode = "update";
+      this.mode = Operator.Update;
       this.currentCell = cell;
     },
 
     submitModel: function() {
-      this.opCell();
+      this.operateCell();
     },
 
     deleteCell: function(cell) {
@@ -173,36 +163,34 @@ export default {
         return;
       }
       this.editData = "";
-      this.mode = "delete";
+      this.mode = Operator.Delete;
       this.currentCell = cell;
-      this.opCell();
+      this.operateCell();
     },
 
-    opCell: async function() {
+    operateCell: async function() {
       const rawTx = getRawTxTemplate();
-      let total = new BN(0);
+      let outputCapacity = new BN(0);
 
-      if (this.mode === "create" || this.mode === "update") {
-        const editData = textToHex(this.editData);
-        let bytes = hexToBytes(editData);
-        let byteLength = bytes.byteLength;
-        let capacity = new BN(byteLength * 100000000);
-        // State Rent
-        capacity = capacity.add(MIN_CAPACITY).add(TRANSACTION_FEE);
+      // Generate outputs and outputsData
+      if (this.mode === Operator.Create || this.mode === Operator.Update) {
+        const data = textToHex(this.editData);
+        outputCapacity = outputCapacity
+          .add(new BN(hexToBytes(data).byteLength * 100000000))
+          .add(MIN_CAPACITY);
 
         rawTx.outputs.push({
-          capacity: `0x${capacity.toString(16)}`,
-          lock: this.toLock
+          capacity: `0x${outputCapacity.toString(16)}`,
+          lock: this.lockScript
         });
-        rawTx.outputsData.push(editData);
-      } else {
-        total = TRANSACTION_FEE;
+        rawTx.outputsData.push(data);
       }
+      outputCapacity = outputCapacity.add(TRANSACTION_FEE);
 
+      // Collect inputs
       let cells = this.emptyCells;
       let inputCapacity = new BN(0);
-      let ok = false;
-      if (this.mode === "update" || this.mode === "delete") {
+      if (this.mode === Operator.Update || this.mode === Operator.Delete) {
         cells = [this.currentCell, ...cells];
       }
       for (let cell of cells) {
@@ -214,54 +202,26 @@ export default {
           since: "0x0"
         });
         rawTx.witnesses.push("0x");
-        let cellCapacity = new BN(parseInt(cell.output.capacity));
-        inputCapacity = inputCapacity.add(cellCapacity);
-        if (inputCapacity.gt(total)) {
-          if (inputCapacity.sub(total).gt(MIN_CAPACITY)) {
-            const change = inputCapacity.sub(total);
-            rawTx.outputs.push({
-              capacity: `0x${change.toString(16)}`,
-              lock: this.toLock
-            });
-            rawTx.outputsData.push("0x");
-          }
-          ok = true;
+        inputCapacity = inputCapacity.add(
+          new BN(parseInt(cell.output.capacity))
+        );
+
+        if (inputCapacity.sub(outputCapacity).gte(MIN_CAPACITY)) {
+          const changeCapacity = inputCapacity.sub(outputCapacity);
+          rawTx.outputs.push({
+            capacity: `0x${changeCapacity.toString(16)}`,
+            lock: this.lockScript
+          });
+          rawTx.outputsData.push("0x");
           break;
         }
       }
-      if (!ok) {
+      if (inputCapacity.sub(outputCapacity).lt(MIN_CAPACITY)) {
         alert("You have not enough CKB!");
         return;
       }
-      rawTx.witnesses[0] = {
-        lock: "",
-        inputType: "",
-        outputType: ""
-      };
-      const ckb = new CKB(RICH_NODE_RPC_URL);
-      const signedTx = ckb.signTransaction(`0x${this.privateKey}`)(rawTx);
-      this.loading = true;
-      try {
-        await ckb.rpc.sendTransaction(signedTx);
-        setTimeout(() => {
-          alert(
-            "Tx has been broadcasted, please refresh later. Typical block interval is 8~30s"
-          );
-        }, 0);
-      } catch (error) {
-        console.error("sendTransaction error:", error);
-        alert("error:", error);
-      }
-      this.loading = false;
+      await sendTransaction(rawTx, this.privateKey);
       this.showModel = false;
-      setTimeout(() => {
-        this.reload();
-      }, 1000);
-    },
-
-    getCells: async function(lockArgs) {
-      this.loading = true;
-      return await fetchCells(lockArgs);
     }
   }
 };
@@ -296,12 +256,13 @@ export default {
         display: block;
         border-radius: 2px;
         border: solid 1px #cccccc;
+        padding: 8px 0;
     }
 
     .row {
         display: flex;
         align-items: flex-end;
-        padding: 16px 0;
+        padding: 12px 0;
     }
 
     .row label {
@@ -349,6 +310,10 @@ export default {
         float: right;
     }
 
+    .cell-ops button {
+        margin-left: 12px;
+    }
+
     .cell-body {
         background-color: #fff;
         padding: 12px;
@@ -383,6 +348,12 @@ export default {
     #model textarea {
         width: 100%;
         height: 10em;
+    }
+
+    .model-buttons {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 12px;
     }
 
 

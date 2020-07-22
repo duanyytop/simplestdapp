@@ -1,6 +1,7 @@
-const {RICH_NODE_INDEXER_URL, SECP256K1_BLAKE160_CODE_HASH} = require("./const");
+const CKB = require("@nervosnetwork/ckb-sdk-core").default;
+const {RICH_NODE_INDEXER_URL, RICH_NODE_RPC_URL, SECP256K1_BLAKE160_CODE_HASH} = require("./const");
 
-const fetchCells = async lockArgs => {
+const getCells = async lockArgs => {
   let payload = {
     id: 3,
     jsonrpc: "2.0",
@@ -34,4 +35,25 @@ const fetchCells = async lockArgs => {
   }
 };
 
-module.exports = {fetchCells};
+const sendTransaction = async (rawTx, privateKey) => {
+  let rawTransaction = rawTx;
+  rawTransaction.witnesses[0] = {
+    lock: "",
+    inputType: "",
+    outputType: ""
+  };
+  const ckb = new CKB(RICH_NODE_RPC_URL);
+  console.log(privateKey);
+  const signedTx = ckb.signTransaction(`0x${privateKey}`)(rawTx);
+  try {
+    const txHash = await ckb.rpc.sendTransaction(signedTx);
+    setTimeout(() => {
+      alert(`Transaction has been broadcasted, please refresh later.\nTx hash: ${txHash}`);
+    }, 0);
+  } catch (error) {
+    console.error("sendTransaction error:", error);
+    alert("error:", error);
+  }
+};
+
+module.exports = {getCells, sendTransaction};

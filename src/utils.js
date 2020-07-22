@@ -1,4 +1,5 @@
 const {utf8ToBytes, bytesToHex, hexToUtf8} = require("@nervosnetwork/ckb-sdk-utils");
+const {SECP256K1_BLAKE160_CODE_HASH} = require("./const");
 
 const formatCkb = value => {
   if (typeof value === "undefined") {
@@ -41,19 +42,17 @@ const hexToText = hex => {
 };
 
 const getSummary = cells => {
-  let capacity = 0;
-  let inuse = 0;
-  let free = 0;
-  for (let cell of cells) {
-    const _capacity = parseInt(cell.output.capacity);
-    capacity += _capacity;
+  const inuse = cells
+    .filter(cell => cell.output_data !== "0x")
+    .map(cell => parseInt(cell.output.capacity))
+    .reduce((acc, curr) => acc + curr);
 
-    if (cell.output_data === "0x") {
-      free += _capacity;
-    } else {
-      inuse += _capacity;
-    }
-  }
+  const free = cells
+    .filter(cell => cell.output_data === "0x")
+    .map(cell => parseInt(cell.output.capacity))
+    .reduce((acc, curr) => acc + curr);
+
+  const capacity = inuse + free;
   return {
     inuse,
     capacity,
@@ -64,6 +63,7 @@ const getSummary = cells => {
 const getRawTxTemplate = () => {
   return {
     version: "0x0",
+    // secp256k1_blake160 transaction hash and index
     cellDeps: [
       {
         outPoint: {
@@ -88,4 +88,12 @@ const groupCells = cells => {
   };
 };
 
-module.exports = {formatCkb, textToHex, hexToText, getSummary, getRawTxTemplate, groupCells};
+const getLockScript = args => {
+  return {
+    codeHash: SECP256K1_BLAKE160_CODE_HASH,
+    hashType: "type",
+    args
+  };
+};
+
+module.exports = {formatCkb, textToHex, hexToText, getSummary, getRawTxTemplate, groupCells, getLockScript};
