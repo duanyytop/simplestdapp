@@ -16,7 +16,7 @@ const getCells = async lockArgs => {
         script_type: "lock"
       },
       "asc",
-      "0x64"
+      "0x3e8"
     ]
   };
   const body = JSON.stringify(payload, null, "  ");

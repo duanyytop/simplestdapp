@@ -20,12 +20,12 @@
             <input id="address" disabled :value="address" />
           </div>
           <div class="row">
-            <label for="balance">Balance without data(CKB):</label>
-            <input id="balance" :value="formatCkb(summary.free)" disabled />
+            <label>Balance without data(CKB):</label>
+            <input :value="formatCkb(summary.free)" disabled />
           </div>
           <div class="row">
-            <label for="balance">Balance (CKB):</label>
-            <input id="balance" :value="formatCkb(summary.capacity)" disabled />
+            <label>Balance (CKB):</label>
+            <input :value="formatCkb(summary.capacity)" disabled />
             <a href="https://faucet.nervos.org/" target="_blank">Get More</a>
           </div>
         </div>
@@ -79,8 +79,7 @@ import {
   hexToBytes,
   privateKeyToPublicKey,
   pubkeyToAddress,
-  blake160,
-  getLockScript
+  blake160
 } from "@nervosnetwork/ckb-sdk-utils";
 
 import {
@@ -89,7 +88,8 @@ import {
   hexToText,
   getRawTxTemplate,
   getSummary,
-  groupCells
+  groupCells,
+  getLockScript
 } from "./utils";
 import { MIN_CAPACITY, TRANSACTION_FEE, Operator } from "./const";
 import { getCells, sendTransaction } from "./rpc";
@@ -175,6 +175,10 @@ export default {
       // Generate outputs and outputsData
       if (this.mode === Operator.Create || this.mode === Operator.Update) {
         const data = textToHex(this.editData);
+        if (!data || data.length % 2 !== 0) {
+          alert("The length of data must be an even number");
+          return;
+        }
         outputCapacity = outputCapacity
           .add(new BN(hexToBytes(data).byteLength * 100000000))
           .add(MIN_CAPACITY);
@@ -331,7 +335,7 @@ export default {
         left: 0;
         top: 0;
         width: 100%;
-        height: 100%;
+        height: 100vh;
         background-color: rgba(128, 128, 128, 0.2);
     }
 
