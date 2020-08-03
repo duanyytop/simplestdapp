@@ -3,18 +3,15 @@
     <div id="appContent">
       <h1>
         Simplest dApp on CKB
-        <a
-          href="https://github.com/liusong1111/simplestdapp"
-          target="_blank"
-        >(Source Code)</a>
+        <a href="https://github.com/liusong1111/simplestdapp" target="_blank">(Source Code)</a>
       </h1>
+
+      <div class="auth">
+        <button @click.prevent="getAuth()">Request Auth</button>
+        <button @click.prevent="reload()">Reload{{ (loading && "ing..") || "" }}</button>
+      </div>
       <form>
         <div class="panel">
-          <div class="row">
-            <label for="private_key">Please input test private key:</label>
-            <input id="private_key" v-model="privateKey" />
-            <button @click.prevent="reload">Confirm</button>
-          </div>
           <div class="row">
             <label for="address">Testnet address:</label>
             <input id="address" disabled :value="address" />
@@ -34,17 +31,13 @@
         <h3>
           Data Cell List
           <button @click.prevent="newCell()">Create Cell</button>
-          <button @click.prevent="reload()">Refresh{{loading && "ing.." || ""}}</button>
+          <button @click.prevent="reload()">Refresh{{ (loading && "ing..") || "" }}</button>
         </h3>
         <div v-if="!filledCells" class="no-data">No Data Cells</div>
         <div>
-          <div
-            class="cell"
-            v-for="cell in filledCells"
-            :key="cell.out_point.tx_hash + cell.out_point.index"
-          >
+          <div class="cell" v-for="cell in filledCells" :key="cell.out_point.tx_hash + cell.out_point.index">
             <div class="cell-header">
-              Capacity: {{formatCkb(cell.output.capacity)}}
+              Capacity: {{ formatCkb(cell.output.capacity) }}
               <div class="cell-ops">
                 <button @click.prevent="deleteCell(cell)">Delete</button>
                 <button @click.prevent="editCell(cell)">Update</button>
@@ -52,7 +45,7 @@
             </div>
             <div class="cell-body">
               Data:
-              {{handleOutputData(cell.output_data)}}
+              {{ handleOutputData(cell.output_data) }}
             </div>
           </div>
         </div>
@@ -75,33 +68,17 @@
 
 <script>
 import * as BN from "bn.js";
-import {
-  hexToBytes,
-  privateKeyToPublicKey,
-  pubkeyToAddress,
-  blake160
-} from "@nervosnetwork/ckb-sdk-utils";
-
-import {
-  formatCkb,
-  textToHex,
-  hexToText,
-  getRawTxTemplate,
-  getSummary,
-  groupCells,
-  getLockScript
-} from "./utils";
-import { MIN_CAPACITY, TRANSACTION_FEE, Operator } from "./const";
-import { getCells, sendTransaction } from "./rpc";
+import {hexToBytes} from "@nervosnetwork/ckb-sdk-utils";
+import {formatCkb, textToHex, hexToText, getRawTxTemplate, getSummary, groupCells} from "./utils";
+import {MIN_CAPACITY, TRANSACTION_FEE, Operator} from "./const";
+import {getCells, requestAuth, queryAddresses, signAndSendTransaction} from "./rpc";
 
 export default {
   name: "App",
   data: function() {
     return {
-      privateKey: "",
       address: "",
       lockScript: {},
-      cells: [],
       emptyCells: [],
       filledCells: [],
       summary: {
@@ -118,23 +95,50 @@ export default {
   components: {},
   methods: {
     reload: async function() {
+      const authToken = window.localStorage.getItem("authToken");
+      if (!authToken) {
+        console.error("No auth token");
+        return;
+      }
       this.loading = true;
-      const publicKey = privateKeyToPublicKey(`0x${this.privateKey}`);
-      const lockArgs = `0x${blake160(publicKey, "hex")}`;
-
-      this.address = pubkeyToAddress(publicKey, { prefix: "ckt" });
-      this.lockScript = getLockScript(lockArgs);
-      this.cells = await getCells(lockArgs);
-      this.loading = false;
-      this.summary = getSummary(this.cells);
-      const { emptyCells, filledCells } = groupCells(this.cells);
-      this.emptyCells = emptyCells;
-      this.filledCells = filledCells;
+      try {
+        const addresses = (await queryAddresses(authToken)).addresses;
+        if (addresses && addresses.length > 0) {
+          this.address = addresses[0].address;
+          this.lockScript = addresses[0].lockScript;
+          const lockArgs = addresses[0].lockScript.args;
+          const cells = await getCells(lockArgs);
+          this.loading = false;
+          if (cells && cells.length > 0) {
+            this.summary = getSummary(cells);
+            const {emptyCells, filledCells} = groupCells(cells);
+            this.emptyCells = emptyCells;
+            this.filledCells = filledCells;
+          }
+        }
+      } catch (error) {
+        console.error(error);
+        this.loading = false;
+      }
     },
 
-    formatCkb: value => formatCkb(value),
+    getAuth: async function() {
+      try {
+        const token = await requestAuth("A simplest dApp");
+        window.localStorage.setItem("authToken", token);
+        await this.reload();
+      } catch (error) {
+        console.error(error);
+      }
+    },
 
-    handleOutputData: data => hexToText(data),
+    formatCkb: function(value) {
+      return formatCkb(value);
+    },
+
+    handleOutputData: function(data) {
+      return hexToText(data);
+    },
 
     cancelModel: function() {
       this.showModel = false;
@@ -179,9 +183,7 @@ export default {
           alert("The length of data must be an even number");
           return;
         }
-        outputCapacity = outputCapacity
-          .add(new BN(hexToBytes(data).byteLength * 100000000))
-          .add(MIN_CAPACITY);
+        outputCapacity = outputCapacity.add(new BN(hexToBytes(data).byteLength * 100000000)).add(MIN_CAPACITY);
 
         rawTx.outputs.push({
           capacity: `0x${outputCapacity.toString(16)}`,
@@ -206,9 +208,7 @@ export default {
           since: "0x0"
         });
         rawTx.witnesses.push("0x");
-        inputCapacity = inputCapacity.add(
-          new BN(parseInt(cell.output.capacity))
-        );
+        inputCapacity = inputCapacity.add(new BN(parseInt(cell.output.capacity)));
 
         if (inputCapacity.sub(outputCapacity).gte(MIN_CAPACITY)) {
           const changeCapacity = inputCapacity.sub(outputCapacity);
@@ -224,7 +224,12 @@ export default {
         alert("You have not enough CKB!");
         return;
       }
-      await sendTransaction(rawTx, this.privateKey);
+      const authToken = window.localStorage.getItem("authToken");
+      if (!authToken) {
+        console.error("No auth token");
+        return;
+      }
+      await signAndSendTransaction(rawTx, authToken);
       this.showModel = false;
     }
   }
@@ -232,133 +237,143 @@ export default {
 </script>
 
 <style>
-    #app {
-        font-family: Avenir, Helvetica, Arial, sans-serif;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        width: 100%;
-    }
+#app {
+  font-family: Avenir, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  width: 100%;
+}
 
-    #appContent {
-        width: 900px;
-        margin: auto;
-    }
+#appContent {
+  width: 900px;
+  margin: auto;
+}
 
-    h1, h3 {
-        text-align: center;
-    }
+h1,
+h3 {
+  text-align: center;
+}
 
-    h3 button {
-        margin-left: 16px;
-    }
+h3 button {
+  margin-left: 16px;
+}
 
-    a {
-        color: #3248DB
-    }
+a {
+  color: #3248db;
+}
 
-    .panel {
-        display: block;
-        border-radius: 2px;
-        border: solid 1px #cccccc;
-        padding: 8px 0;
-    }
+.panel {
+  display: block;
+  border-radius: 2px;
+  border: solid 1px #cccccc;
+  padding: 8px 0;
+}
 
-    .row {
-        display: flex;
-        align-items: flex-end;
-        padding: 12px 0;
-    }
+.auth {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 12px 0;
+}
 
-    .row label {
-        width: 240px;
-    }
+.auth button {
+  margin: 0 12px;
+}
 
-    .row button {
-        margin-left: 16px;
-        height: 25px;
-    }
+.row {
+  display: flex;
+  align-items: flex-end;
+  padding: 12px 0;
+}
 
-    .row a {
-        margin-left: 16px;
-    }
+.row label {
+  width: 240px;
+}
 
-    label {
-        display: table-cell;
-        padding: 6px 8px;
-        text-align: right;
-    }
+.row button {
+  margin-left: 16px;
+  height: 25px;
+}
 
-    input {
-        width: 36em;
-        height: 24px;
-    }
+.row a {
+  margin-left: 16px;
+}
 
-    .no-data {
-        background-color: #f0f0f0;
-        padding: 20px;
-        text-align: center;
-    }
+label {
+  display: table-cell;
+  padding: 6px 8px;
+  text-align: right;
+}
 
-    .cell {
-        margin: 16px 0;
-        padding: 8px;
-        border: 1px solid #ccc;
-        background-color: #f0f0f0;
-    }
+input {
+  width: 36em;
+  height: 24px;
+}
 
-    .cell-header {
-        padding: 8px;
-    }
+.no-data {
+  background-color: #f0f0f0;
+  padding: 20px;
+  text-align: center;
+}
 
-    .cell-ops {
-        float: right;
-    }
+.cell {
+  margin: 16px 0;
+  padding: 8px;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
+}
 
-    .cell-ops button {
-        margin-left: 12px;
-    }
+.cell-header {
+  padding: 8px;
+}
 
-    .cell-body {
-        background-color: #fff;
-        padding: 12px;
-        word-wrap: break-word;
-        word-break: break-all;
-    }
+.cell-ops {
+  float: right;
+}
 
-    .hidden {
-        display: none;
-    }
+.cell-ops button {
+  margin-left: 12px;
+}
 
-    #model {
-        position: absolute;
-        z-index: 2;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100vh;
-        background-color: rgba(128, 128, 128, 0.2);
-    }
+.cell-body {
+  background-color: #fff;
+  padding: 12px;
+  word-wrap: break-word;
+  word-break: break-all;
+}
 
-    #model .model-content {
-        position: relative;
-        top: 300px;
-        margin: auto;
-        width: 50em;
-        background-color: #ccc;
-        padding: 0 20px 20px 20px;
-        border: 1px solid #999;
-    }
+.hidden {
+  display: none;
+}
 
-    #model textarea {
-        width: 100%;
-        height: 10em;
-    }
+#model {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100vh;
+  background-color: rgba(128, 128, 128, 0.2);
+}
 
-    .model-buttons {
-        display: flex;
-        justify-content: space-around;
-        margin-top: 12px;
-    }
+#model .model-content {
+  position: relative;
+  top: 300px;
+  margin: auto;
+  width: 50em;
+  background-color: #ccc;
+  padding: 0 20px 20px 20px;
+  border: 1px solid #999;
+}
 
+#model textarea {
+  width: 100%;
+  height: 10em;
+}
 
+.model-buttons {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 12px;
+}
 </style>

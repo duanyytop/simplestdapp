@@ -1,9 +1,8 @@
-const CKB = require("@nervosnetwork/ckb-sdk-core").default;
-const {RICH_NODE_INDEXER_URL, RICH_NODE_RPC_URL, SECP256K1_BLAKE160_CODE_HASH} = require("./const");
+const {KEYPERING_URL, RICH_NODE_INDEXER_URL, SECP256K1_BLAKE160_CODE_HASH} = require("./const");
 
 const getCells = async lockArgs => {
   let payload = {
-    id: 3,
+    id: 1,
     jsonrpc: "2.0",
     method: "get_cells",
     params: [
@@ -23,10 +22,10 @@ const getCells = async lockArgs => {
   try {
     let res = await fetch(RICH_NODE_INDEXER_URL, {
       method: "POST",
-      body,
       headers: {
         "Content-Type": "application/json"
-      }
+      },
+      body
     });
     res = await res.json();
     return res.result.objects;
@@ -35,25 +34,70 @@ const getCells = async lockArgs => {
   }
 };
 
-const sendTransaction = async (rawTx, privateKey) => {
+const requestAuth = async description => {
+  try {
+    let res = await fetch(KEYPERING_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        id: 2,
+        jsonrpc: "2.0",
+        method: "auth",
+        params: {description}
+      })
+    });
+    res = await res.json();
+    return res.result.token;
+  } catch (error) {
+    console.error("error", error);
+  }
+};
+
+const queryAddresses = async token => {
+  try {
+    let res = await fetch(KEYPERING_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        id: 3,
+        jsonrpc: "2.0",
+        method: "query_addresses",
+        params: {}
+      })
+    });
+    res = await res.json();
+    return res.result;
+  } catch (error) {
+    console.error("error", error);
+  }
+};
+
+const signAndSendTransaction = async (rawTx, token) => {
   let rawTransaction = rawTx;
   rawTransaction.witnesses[0] = {
     lock: "",
     inputType: "",
     outputType: ""
   };
-  const ckb = new CKB(RICH_NODE_RPC_URL);
-  console.log(privateKey);
-  const signedTx = ckb.signTransaction(`0x${privateKey}`)(rawTx);
   try {
-    const txHash = await ckb.rpc.sendTransaction(signedTx);
-    setTimeout(() => {
-      alert(`Transaction has been broadcasted, please refresh later.\nTx hash: ${txHash}`);
-    }, 0);
+    let res = fetch(KEYPERING_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        id: 4,
+        jsonrpc: "2.0",
+        method: "sign_and_send_transaction",
+        params: {tx: rawTransaction}
+      })
+    });
+    res = await res.json();
+    return res.result;
   } catch (error) {
-    console.error("sendTransaction error:", error);
-    alert("error:", error);
+    console.error("error", error);
   }
 };
 
-module.exports = {getCells, sendTransaction};
+module.exports = {getCells, requestAuth, queryAddresses, signAndSendTransaction};

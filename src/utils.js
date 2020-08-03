@@ -1,4 +1,4 @@
-const {utf8ToBytes, bytesToHex, hexToUtf8} = require("@nervosnetwork/ckb-sdk-utils");
+const {utf8ToBytes, bytesToHex, hexToUtf8, parseAddress} = require("@nervosnetwork/ckb-sdk-utils");
 const {SECP256K1_BLAKE160_CODE_HASH} = require("./const");
 
 const formatCkb = value => {
@@ -41,16 +41,21 @@ const hexToText = hex => {
   return result;
 };
 
+const addressToArgs = address => {
+  let payload = parseAddress(address, "hex");
+  return `0x${payload.substring(payload.startsWith("0x") ? 6 : 4)}`;
+};
+
 const getSummary = cells => {
   const inuse = cells
     .filter(cell => cell.output_data !== "0x")
     .map(cell => parseInt(cell.output.capacity))
-    .reduce((acc, curr) => acc + curr);
+    .reduce((acc, curr) => acc + curr, 0);
 
   const free = cells
     .filter(cell => cell.output_data === "0x")
     .map(cell => parseInt(cell.output.capacity))
-    .reduce((acc, curr) => acc + curr);
+    .reduce((acc, curr) => acc + curr, 0);
 
   const capacity = inuse + free;
   return {
@@ -96,4 +101,13 @@ const getLockScript = args => {
   };
 };
 
-module.exports = {formatCkb, textToHex, hexToText, getSummary, getRawTxTemplate, groupCells, getLockScript};
+module.exports = {
+  formatCkb,
+  textToHex,
+  hexToText,
+  addressToArgs,
+  getSummary,
+  getRawTxTemplate,
+  groupCells,
+  getLockScript
+};
