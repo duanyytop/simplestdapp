@@ -1,5 +1,7 @@
 # Simplest DApp on Nervos CKB
 
+[Live Demo](https://prototype.ckbapp.dev/simplest-dapp/)
+
 ## What is Simplest DApp
 
 Simplest DApp is a simple DApp on [Nervos CKB](https://www.nervos.org/) which allow user to create, update and delete cell data.
