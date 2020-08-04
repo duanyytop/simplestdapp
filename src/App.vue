@@ -79,6 +79,7 @@ export default {
     return {
       address: "",
       lockScript: {},
+      lockHash: "",
       emptyCells: [],
       filledCells: [],
       summary: {
@@ -106,6 +107,7 @@ export default {
         if (addresses && addresses.length > 0) {
           this.address = addresses[0].address;
           this.lockScript = addresses[0].lockScript;
+          this.lockHash = addresses[0].lockHash;
           const lockArgs = addresses[0].lockScript.args;
           const cells = await getCells(lockArgs);
           this.loading = false;
@@ -124,7 +126,7 @@ export default {
 
     getAuth: async function() {
       try {
-        const token = await requestAuth("A simplest dApp");
+        const token = await requestAuth("Simplest DApp");
         window.localStorage.setItem("authToken", token);
         await this.reload();
       } catch (error) {
@@ -229,7 +231,7 @@ export default {
         console.error("No auth token");
         return;
       }
-      await signAndSendTransaction(rawTx, authToken);
+      await signAndSendTransaction(rawTx, authToken, this.lockHash);
       this.showModel = false;
     }
   }

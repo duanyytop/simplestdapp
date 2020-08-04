@@ -1,4 +1,4 @@
-const {KEYPERING_URL, RICH_NODE_INDEXER_URL, SECP256K1_BLAKE160_CODE_HASH} = require("./const");
+const {KEYPERING_URL, RICH_NODE_INDEXER_URL, SECP256K1_BLAKE160_CODE_HASH, DAPP_DESCRIPTION} = require("./const");
 
 const getCells = async lockArgs => {
   let payload = {
@@ -73,7 +73,7 @@ const queryAddresses = async token => {
   }
 };
 
-const signAndSendTransaction = async (rawTx, token) => {
+const signAndSendTransaction = async (rawTx, token, lockHash) => {
   let rawTransaction = rawTx;
   rawTransaction.witnesses[0] = {
     lock: "",
@@ -90,7 +90,7 @@ const signAndSendTransaction = async (rawTx, token) => {
         id: 4,
         jsonrpc: "2.0",
         method: "sign_and_send_transaction",
-        params: {tx: rawTransaction}
+        params: {tx: rawTransaction, lockHash, description: DAPP_DESCRIPTION}
       })
     });
     res = await res.json();
