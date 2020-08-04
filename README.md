@@ -12,6 +12,8 @@ Simplest DApp is an example for [Nervos CKB](https://www.nervos.org/) developers
 
 Simplest DApp never touch users' private keys and it's all operations which need private keys will delegate [Keypering](https://github.com/Keith-CY/keypering) to complement. [Keypering](https://github.com/Keith-CY/keypering) is a desktop wallet that manages user's private keys and lock scripts and responds to requests from DApps.
 
+![Keypering Wallet](./keypering.png)
+
 For example, when Simplest DApp need to sign transaction, it will send request to [Keypering](https://github.com/Keith-CY/keypering) and delegate it to sign transaction with its' private keys and return signed transaction to Simplest DApp. 
 
 ### Workflow
