@@ -36,13 +36,17 @@ For example, when Simplest DApp need to sign transaction, it will send request t
 
 > Note: Every transaction that has been sent to CKB successfully will be viewed on [Nervos CKB Explorer](https://explorer.nervos.org/) which includes [Mainnet](https://explorer.nervos.org/) and [Testnet](https://explorer.nervos.org/aggron/).
 
-> Note: [CKB Rich Node](https://github.com/ququzone/ckb-rich-node) includes [ckb node](https://github.com/nervosnetwork/ckb) and [ckb indexer](https://github.com/nervosnetwork/ckb-indexer) and [Keypering protocol](https://nervosnetwork.github.io/keypering/#/protocol) document will be helpful for you.
+> Note: [CKB Rich Node](https://github.com/ququzone/ckb-rich-node) includes [ckb node](https://github.com/nervosnetwork/ckb) and [ckb indexer](https://github.com/nervosnetwork/ckb-indexer) and [Keypering Agency Protocol](https://nervosnetwork.github.io/keypering/#/protocol) document will be helpful for you.
 
 ## Build Setup
 
 Requires Node.js 8+
 
 ```shell
+git clone https://github.com/duanyytop/simplestdapp.git
+
+cd simplestdapp
+
 # install dependencies
 yarn install
 
@@ -52,3 +56,11 @@ yarn serve
 # build for production
 yarn build
 ```
+
+## Resources
+
+- [Keypering Agency Protocol](https://nervosnetwork.github.io/keypering/#/protocol) - DApp Developer Guide of Keypering
+- [CKB Rich Node](https://github.com/ququzone/ckb-rich-node) - Remote server which includes [ckb node](https://github.com/nervosnetwork/ckb) and ckb indexer
+- [CKB Indexer](https://github.com/quake/ckb-indexer) - Core Module of CKB Rich Node
+- [CKB Explorer](https://explorer.nervos.org)
+- [CKB Faucet](https://faucet.nervos.org)
