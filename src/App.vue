@@ -3,7 +3,7 @@
     <div id="appContent">
       <h1>
         Simplest DApp on CKB
-        <a href="https://github.com/liusong1111/simplestdapp" target="_blank">(Source Code)</a>
+        <a href="https://github.com/duanyytop/simplestdapp" target="_blank">(Source Code)</a>
       </h1>
 
       <div class="auth">
