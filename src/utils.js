@@ -1,105 +1,107 @@
-const {utf8ToBytes, bytesToHex, hexToUtf8, parseAddress} = require("@nervosnetwork/ckb-sdk-utils");
-const {SECP256K1_BLAKE160_CODE_HASH} = require("./const");
+const { utf8ToBytes, bytesToHex, hexToUtf8, parseAddress } = require('@nervosnetwork/ckb-sdk-utils')
+const { SECP256K1_BLAKE160_CODE_HASH } = require('./const')
 
 const formatCkb = value => {
-  if (typeof value === "undefined") {
-    return undefined;
+  if (typeof value === 'undefined') {
+    return undefined
   }
-  let fraction = value % 100000000;
-  fraction = fraction.toString().padStart(8, "0");
-  let integer = Math.floor(value / 100000000);
-  const format = new Intl.NumberFormat({useGrouping: true});
-  integer = format.format(integer);
-  return integer + "." + fraction;
-};
+  let fraction = value % 100000000
+  fraction = fraction.toString().padStart(8, '0')
+  let integer = Math.floor(value / 100000000)
+  const format = new Intl.NumberFormat({
+    useGrouping: true,
+  })
+  integer = format.format(integer)
+  return integer + '.' + fraction
+}
 
 const textToHex = text => {
-  let result = text.trim();
-  if (result.startsWith("0x")) {
-    return result;
+  let result = text.trim()
+  if (result.startsWith('0x')) {
+    return result
   }
-  const bytes = utf8ToBytes(result);
-  result = bytesToHex(bytes);
-  return result;
-};
+  const bytes = utf8ToBytes(result)
+  result = bytesToHex(bytes)
+  return result
+}
 
 const hexToText = hex => {
-  let result = hex.trim();
+  let result = hex.trim()
   try {
-    result = hexToUtf8(result);
-    let isAscii = true;
+    result = hexToUtf8(result)
+    let isAscii = true
     for (let i = 0; i < result.length; i++) {
       if (result.charCodeAt(i) > 255) {
-        isAscii = false;
-        break;
+        isAscii = false
+        break
       }
     }
-    return isAscii ? result : hex.trim();
+    return isAscii ? result : hex.trim()
   } catch (error) {
-    console.error("hexToUtf8 error:", error);
+    console.error('hexToUtf8 error:', error)
   }
-  return result;
-};
+  return result
+}
 
 const addressToArgs = address => {
-  let payload = parseAddress(address, "hex");
-  return `0x${payload.substring(payload.startsWith("0x") ? 6 : 4)}`;
-};
+  let payload = parseAddress(address, 'hex')
+  return `0x${payload.substring(payload.startsWith('0x') ? 6 : 4)}`
+}
 
 const getSummary = cells => {
   const inuse = cells
-    .filter(cell => cell.output_data !== "0x")
+    .filter(cell => cell.output_data !== '0x')
     .map(cell => parseInt(cell.output.capacity))
-    .reduce((acc, curr) => acc + curr, 0);
+    .reduce((acc, curr) => acc + curr, 0)
 
   const free = cells
-    .filter(cell => cell.output_data === "0x")
+    .filter(cell => cell.output_data === '0x')
     .map(cell => parseInt(cell.output.capacity))
-    .reduce((acc, curr) => acc + curr, 0);
+    .reduce((acc, curr) => acc + curr, 0)
 
-  const capacity = inuse + free;
+  const capacity = inuse + free
   return {
     inuse,
     capacity,
-    free
-  };
-};
+    free,
+  }
+}
 
 const getRawTxTemplate = () => {
   return {
-    version: "0x0",
+    version: '0x0',
     // secp256k1_blake160 transaction hash and index
     cellDeps: [
       {
         outPoint: {
-          txHash: "0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37",
-          index: "0x0"
+          txHash: '0xf8de3bb47d055cdf460d93a2a6e1b05f7432f9777c8c474abf4eec1d4aee5d37',
+          index: '0x0',
         },
-        depType: "depGroup"
-      }
+        depType: 'depGroup',
+      },
     ],
     headerDeps: [],
     inputs: [],
     outputs: [],
     witnesses: [],
-    outputsData: []
-  };
-};
+    outputsData: [],
+  }
+}
 
 const groupCells = cells => {
   return {
-    emptyCells: cells.filter(cell => !cell.output_data || cell.output_data === "0x"),
-    filledCells: cells.filter(cell => cell.output_data !== "0x")
-  };
-};
+    emptyCells: cells.filter(cell => !cell.output_data || cell.output_data === '0x'),
+    filledCells: cells.filter(cell => cell.output_data !== '0x'),
+  }
+}
 
 const getLockScript = args => {
   return {
     codeHash: SECP256K1_BLAKE160_CODE_HASH,
-    hashType: "type",
-    args
-  };
-};
+    hashType: 'type',
+    args,
+  }
+}
 
 module.exports = {
   formatCkb,
@@ -109,5 +111,5 @@ module.exports = {
   getSummary,
   getRawTxTemplate,
   groupCells,
-  getLockScript
-};
+  getLockScript,
+}

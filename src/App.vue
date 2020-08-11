@@ -8,7 +8,7 @@
 
       <div class="auth">
         <button @click.prevent="getAuth()">Request Auth</button>
-        <button @click.prevent="reload()">Reload{{ (loading && "ing..") || "" }}</button>
+        <button @click.prevent="reload()">Reload{{ (loading && 'ing..') || '' }}</button>
       </div>
       <form>
         <div class="panel">
@@ -31,7 +31,7 @@
         <h3>
           Data Cell List
           <button @click.prevent="newCell()">Create Cell</button>
-          <button @click.prevent="reload()">Refresh{{ (loading && "ing..") || "" }}</button>
+          <button @click.prevent="reload()">Refresh{{ (loading && 'ing..') || '' }}</button>
         </h3>
         <div v-if="!filledCells" class="no-data">No Data Cells</div>
         <div>
@@ -50,7 +50,7 @@
           </div>
         </div>
       </div>
-      <div id="model" :class="{hidden: !this.showModel}">
+      <div id="model" :class="{ hidden: !this.showModel }">
         <div class="model-content">
           <h3>Input Data Content</h3>
           <div>
@@ -67,175 +67,174 @@
 </template>
 
 <script>
-import * as BN from "bn.js";
-import {hexToBytes} from "@nervosnetwork/ckb-sdk-utils";
-import {formatCkb, textToHex, hexToText, getRawTxTemplate, getSummary, groupCells} from "./utils";
-import {MIN_CAPACITY, TRANSACTION_FEE, Operator} from "./const";
-import {getCells, requestAuth, queryAddresses, signAndSendTransaction} from "./rpc";
+import * as BN from 'bn.js'
+import { hexToBytes } from '@nervosnetwork/ckb-sdk-utils'
+import { formatCkb, textToHex, hexToText, getRawTxTemplate, getSummary, groupCells } from './utils'
+import { MIN_CAPACITY, TRANSACTION_FEE, Operator } from './const'
+import { getCells, requestAuth, queryAddresses, signAndSendTransaction } from './rpc'
 
 export default {
-  name: "App",
-  data: function() {
+  name: 'App',
+  data: function () {
     return {
-      address: "",
-      lockScript: {},
-      lockHash: "",
+      address: '',
+      lockScript: undefined,
+      lockHash: '',
       emptyCells: [],
       filledCells: [],
       summary: {
         inuse: 0,
         free: 0,
-        capacity: 0
+        capacity: 0,
       },
       showModel: false,
       mode: Operator.Create,
-      editData: "",
-      loading: false
-    };
+      editData: '',
+      loading: false,
+    }
   },
-  components: {},
   methods: {
-    reload: async function() {
-      const authToken = window.localStorage.getItem("authToken");
+    reload: async function () {
+      const authToken = window.localStorage.getItem('authToken')
       if (!authToken) {
-        console.error("No auth token");
-        return;
+        console.error('No auth token')
+        return
       }
-      this.loading = true;
+      this.loading = true
       try {
-        const addresses = (await queryAddresses(authToken)).addresses;
+        const addresses = (await queryAddresses(authToken)).addresses
         if (addresses && addresses.length > 0) {
-          this.address = addresses[0].address;
-          this.lockScript = addresses[0].lockScript;
-          this.lockHash = addresses[0].lockHash;
-          const lockArgs = addresses[0].lockScript.args;
-          const cells = await getCells(lockArgs);
-          this.loading = false;
+          this.address = addresses[0].address
+          this.lockScript = addresses[0].lockScript
+          this.lockHash = addresses[0].lockHash
+          const lockArgs = addresses[0].lockScript.args
+          const cells = await getCells(lockArgs)
+          this.loading = false
           if (cells && cells.length > 0) {
-            this.summary = getSummary(cells);
-            const {emptyCells, filledCells} = groupCells(cells);
-            this.emptyCells = emptyCells;
-            this.filledCells = filledCells;
+            this.summary = getSummary(cells)
+            const { emptyCells, filledCells } = groupCells(cells)
+            this.emptyCells = emptyCells
+            this.filledCells = filledCells
           }
         }
       } catch (error) {
-        console.error(error);
-        this.loading = false;
+        console.error(error)
+        this.loading = false
       }
     },
 
-    getAuth: async function() {
+    getAuth: async function () {
       try {
-        const token = await requestAuth("Simplest DApp");
-        window.localStorage.setItem("authToken", token);
-        await this.reload();
+        const token = await requestAuth('Simplest DApp')
+        window.localStorage.setItem('authToken', token)
+        await this.reload()
       } catch (error) {
-        console.error(error);
+        console.error(error)
       }
     },
 
-    formatCkb: function(value) {
-      return formatCkb(value);
+    formatCkb: function (value) {
+      return formatCkb(value)
     },
 
-    handleOutputData: function(data) {
-      return hexToText(data);
+    handleOutputData: function (data) {
+      return hexToText(data)
     },
 
-    cancelModel: function() {
-      this.showModel = false;
+    cancelModel: function () {
+      this.showModel = false
     },
 
-    newCell: function() {
-      this.showModel = true;
-      this.editData = "";
-      this.mode = Operator.Create;
-      this.currentCell = null;
+    newCell: function () {
+      this.showModel = true
+      this.editData = ''
+      this.mode = Operator.Create
+      this.currentCell = null
     },
 
-    editCell: function(cell) {
-      this.showModel = true;
-      this.editData = hexToText(cell.output_data);
-      this.mode = Operator.Update;
-      this.currentCell = cell;
+    editCell: function (cell) {
+      this.showModel = true
+      this.editData = hexToText(cell.output_data)
+      this.mode = Operator.Update
+      this.currentCell = cell
     },
 
-    submitModel: function() {
-      this.operateCell();
+    submitModel: function () {
+      this.operateCell()
     },
 
-    deleteCell: function(cell) {
-      if (!confirm("Are you sure to delete this cell?")) {
-        return;
+    deleteCell: function (cell) {
+      if (!confirm('Are you sure to delete this cell?')) {
+        return
       }
-      this.editData = "";
-      this.mode = Operator.Delete;
-      this.currentCell = cell;
-      this.operateCell();
+      this.editData = ''
+      this.mode = Operator.Delete
+      this.currentCell = cell
+      this.operateCell()
     },
 
-    operateCell: async function() {
-      const rawTx = getRawTxTemplate();
-      let outputCapacity = new BN(0);
+    operateCell: async function () {
+      const rawTx = getRawTxTemplate()
+      let outputCapacity = new BN(0)
 
       // Generate outputs and outputsData
       if (this.mode === Operator.Create || this.mode === Operator.Update) {
-        const data = textToHex(this.editData);
+        const data = textToHex(this.editData)
         if (!data || data.length % 2 !== 0) {
-          alert("The length of data must be an even number");
-          return;
+          alert('The length of data must be an even number')
+          return
         }
-        outputCapacity = outputCapacity.add(new BN(hexToBytes(data).byteLength * 100000000)).add(MIN_CAPACITY);
+        outputCapacity = outputCapacity.add(new BN(hexToBytes(data).byteLength * 100000000)).add(MIN_CAPACITY)
 
         rawTx.outputs.push({
           capacity: `0x${outputCapacity.toString(16)}`,
-          lock: this.lockScript
-        });
-        rawTx.outputsData.push(data);
+          lock: this.lockScript,
+        })
+        rawTx.outputsData.push(data)
       }
-      outputCapacity = outputCapacity.add(TRANSACTION_FEE);
+      outputCapacity = outputCapacity.add(TRANSACTION_FEE)
 
       // Collect inputs
-      let cells = this.emptyCells;
-      let inputCapacity = new BN(0);
+      let cells = this.emptyCells
+      let inputCapacity = new BN(0)
       if (this.mode === Operator.Update || this.mode === Operator.Delete) {
-        cells = [this.currentCell, ...cells];
+        cells = [this.currentCell, ...cells]
       }
       for (let cell of cells) {
         rawTx.inputs.push({
           previousOutput: {
             txHash: cell.out_point.tx_hash,
-            index: cell.out_point.index
+            index: cell.out_point.index,
           },
-          since: "0x0"
-        });
-        rawTx.witnesses.push("0x");
-        inputCapacity = inputCapacity.add(new BN(parseInt(cell.output.capacity)));
+          since: '0x0',
+        })
+        rawTx.witnesses.push('0x')
+        inputCapacity = inputCapacity.add(new BN(parseInt(cell.output.capacity)))
 
         if (inputCapacity.sub(outputCapacity).gte(MIN_CAPACITY)) {
-          const changeCapacity = inputCapacity.sub(outputCapacity);
+          const changeCapacity = inputCapacity.sub(outputCapacity)
           rawTx.outputs.push({
             capacity: `0x${changeCapacity.toString(16)}`,
-            lock: this.lockScript
-          });
-          rawTx.outputsData.push("0x");
-          break;
+            lock: this.lockScript,
+          })
+          rawTx.outputsData.push('0x')
+          break
         }
       }
       if (inputCapacity.sub(outputCapacity).lt(MIN_CAPACITY)) {
-        alert("You have not enough CKB!");
-        return;
+        alert('You have not enough CKB!')
+        return
       }
-      const authToken = window.localStorage.getItem("authToken");
+      const authToken = window.localStorage.getItem('authToken')
       if (!authToken) {
-        console.error("No auth token");
-        return;
+        console.error('No auth token')
+        return
       }
-      await signAndSendTransaction(rawTx, authToken, this.lockHash);
-      this.showModel = false;
-    }
-  }
-};
+      await signAndSendTransaction(rawTx, authToken, this.lockHash)
+      this.showModel = false
+    },
+  },
+}
 </script>
 
 <style>
