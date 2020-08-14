@@ -1,4 +1,4 @@
-const { utf8ToBytes, bytesToHex, hexToUtf8, parseAddress } = require('@nervosnetwork/ckb-sdk-utils')
+const { bytesToHex, parseAddress, hexToBytes } = require('@nervosnetwork/ckb-sdk-utils')
 const { SECP256K1_BLAKE160_CODE_HASH } = require('./const')
 
 const formatCkb = value => {
@@ -20,23 +20,14 @@ const textToHex = text => {
   if (result.startsWith('0x')) {
     return result
   }
-  const bytes = utf8ToBytes(result)
-  result = bytesToHex(bytes)
+  result = bytesToHex(new TextEncoder().encode(result))
   return result
 }
 
 const hexToText = hex => {
   let result = hex.trim()
   try {
-    result = hexToUtf8(result)
-    let isAscii = true
-    for (let i = 0; i < result.length; i++) {
-      if (result.charCodeAt(i) > 255) {
-        isAscii = false
-        break
-      }
-    }
-    return isAscii ? result : hex.trim()
+    result = new TextDecoder().decode(hexToBytes(result))
   } catch (error) {
     console.error('hexToUtf8 error:', error)
   }

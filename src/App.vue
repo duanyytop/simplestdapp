@@ -54,7 +54,7 @@
         <div class="model-content">
           <h3>Input Data Content</h3>
           <div>
-            <textarea v-model="editData" placeholder="content in hex-string format"></textarea>
+            <textarea v-model="editData" placeholder="Please input any string you want"></textarea>
           </div>
           <div class="model-buttons">
             <button @click.prevent="cancelModel()">Cancel</button>
