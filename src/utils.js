@@ -1,7 +1,8 @@
-const { bytesToHex, parseAddress, hexToBytes } = require('@nervosnetwork/ckb-sdk-utils')
-const { SECP256K1_BLAKE160_CODE_HASH } = require('./const')
+import { bytesToHex, parseAddress, hexToBytes } from '@nervosnetwork/ckb-sdk-utils'
+import { SECP256K1_BLAKE160_CODE_HASH } from './const'
+import { requestAuth } from './rpc'
 
-const formatCkb = value => {
+export const formatCkb = value => {
   if (typeof value === 'undefined') {
     return undefined
   }
@@ -15,7 +16,7 @@ const formatCkb = value => {
   return integer + '.' + fraction
 }
 
-const textToHex = text => {
+export const textToHex = text => {
   let result = text.trim()
   if (result.startsWith('0x')) {
     return result
@@ -24,7 +25,7 @@ const textToHex = text => {
   return result
 }
 
-const hexToText = hex => {
+export const hexToText = hex => {
   let result = hex.trim()
   try {
     result = new TextDecoder().decode(hexToBytes(result))
@@ -34,12 +35,12 @@ const hexToText = hex => {
   return result
 }
 
-const addressToArgs = address => {
+export const addressToArgs = address => {
   let payload = parseAddress(address, 'hex')
   return `0x${payload.substring(payload.startsWith('0x') ? 6 : 4)}`
 }
 
-const getSummary = cells => {
+export const getSummary = cells => {
   const inuse = cells
     .filter(cell => cell.output_data !== '0x')
     .map(cell => parseInt(cell.output.capacity))
@@ -58,7 +59,7 @@ const getSummary = cells => {
   }
 }
 
-const getRawTxTemplate = () => {
+export const getRawTxTemplate = () => {
   return {
     version: '0x0',
     // secp256k1_blake160 transaction hash and index
@@ -79,14 +80,14 @@ const getRawTxTemplate = () => {
   }
 }
 
-const groupCells = cells => {
+export const groupCells = cells => {
   return {
     emptyCells: cells.filter(cell => !cell.output_data || cell.output_data === '0x'),
     filledCells: cells.filter(cell => cell.output_data !== '0x'),
   }
 }
 
-const getLockScript = args => {
+export const getLockScript = args => {
   return {
     codeHash: SECP256K1_BLAKE160_CODE_HASH,
     hashType: 'type',
@@ -94,13 +95,21 @@ const getLockScript = args => {
   }
 }
 
-module.exports = {
-  formatCkb,
-  textToHex,
-  hexToText,
-  addressToArgs,
-  getSummary,
-  getRawTxTemplate,
-  groupCells,
-  getLockScript,
+export const validWallets = async () => {
+  let wallets = []
+  try {
+    const token = await requestAuth('Simplest DApp')
+    window.localStorage.setItem('authToken', token)
+    if (token) {
+      wallets.push('Keyper')
+    }
+  } catch (error) {
+    console.error(error)
+  }
+  setTimeout(() => {
+    if (window.ckb) {
+      wallets.push('Synapse')
+    }
+  }, 500)
+  return wallets
 }

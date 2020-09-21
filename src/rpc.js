@@ -1,6 +1,24 @@
-const { KEYPERING_URL, RICH_NODE_INDEXER_URL, SECP256K1_BLAKE160_CODE_HASH, DAPP_DESCRIPTION } = require('./const')
+import { KEYPERING_URL, RICH_NODE_INDEXER_URL, SECP256K1_BLAKE160_CODE_HASH, DAPP_DESCRIPTION } from './const'
 
-const getCells = async lockArgs => {
+export const getCells = async (wallet, lockArgs) => {
+  if (wallet === 'Synapse') {
+    const { data } = await window.ckb.getLiveCells({
+      limit: 20,
+      typeHash: 'isNull',
+    })
+    const cells = data.map(cell => ({
+      ...cell,
+      output: {
+        capacity: cell.capacity,
+      },
+      output_data: cell.outputData,
+      out_point: {
+        index: cell.outPoint.index,
+        tx_hash: cell.outPoint.txHash,
+      },
+    }))
+    return cells
+  }
   let payload = {
     id: 1,
     jsonrpc: '2.0',
@@ -34,7 +52,7 @@ const getCells = async lockArgs => {
   }
 }
 
-const requestAuth = async description => {
+export const requestAuth = async description => {
   try {
     let res = await fetch(KEYPERING_URL, {
       method: 'POST',
@@ -54,7 +72,7 @@ const requestAuth = async description => {
   }
 }
 
-const queryAddresses = async token => {
+export const queryAddresses = async token => {
   try {
     let res = await fetch(KEYPERING_URL, {
       method: 'POST',
@@ -74,12 +92,22 @@ const queryAddresses = async token => {
   }
 }
 
-const signAndSendTransaction = async (rawTx, token, lockHash) => {
+export const signAndSendTransaction = async (wallet, rawTx, token, lockHash) => {
   let rawTransaction = rawTx
   rawTransaction.witnesses[0] = {
     lock: '',
     inputType: '',
     outputType: '',
+  }
+  if (wallet === 'Synapse') {
+    try {
+      const result = await window.ckb.signSend({
+        tx: rawTransaction,
+      })
+      return result
+    } catch (error) {
+      console.error(error)
+    }
   }
   try {
     let res = fetch(KEYPERING_URL, {
@@ -103,11 +131,4 @@ const signAndSendTransaction = async (rawTx, token, lockHash) => {
   } catch (error) {
     console.error('error', error)
   }
-}
-
-module.exports = {
-  getCells,
-  requestAuth,
-  queryAddresses,
-  signAndSendTransaction,
 }

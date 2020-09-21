@@ -6,8 +6,18 @@
         <a href="https://github.com/duanyytop/simplestdapp" target="_blank">(Source Code)</a>
       </h1>
 
+      <h4>Select Valid Wallet:</h4>
+      <div v-if="wallets">
+        <div class="wallets" v-for="(wallet, index) in wallets" :key="wallet">
+          <div class="wallet">
+            <input type="radio" :id="wallet" :value="wallet" v-model="selectWallet" :checked="index === 0" />
+            <label :for="wallet">{{ wallet }}</label>
+          </div>
+        </div>
+      </div>
+      <div v-else>No valid wallets, please install Synapse or Keyper</div>
+
       <div class="auth">
-        <button @click.prevent="getAuth()">Request Auth</button>
         <button @click.prevent="reload()">Reload{{ (loading && 'ing..') || '' }}</button>
       </div>
       <form>
@@ -68,15 +78,17 @@
 
 <script>
 import * as BN from 'bn.js'
-import { hexToBytes } from '@nervosnetwork/ckb-sdk-utils'
-import { formatCkb, textToHex, hexToText, getRawTxTemplate, getSummary, groupCells } from './utils'
+import { hexToBytes, pubkeyToAddress } from '@nervosnetwork/ckb-sdk-utils'
+import { formatCkb, textToHex, hexToText, getRawTxTemplate, getSummary, groupCells, validWallets } from './utils'
 import { MIN_CAPACITY, TRANSACTION_FEE, Operator } from './const'
-import { getCells, requestAuth, queryAddresses, signAndSendTransaction } from './rpc'
+import { getCells, queryAddresses, signAndSendTransaction } from './rpc'
 
 export default {
   name: 'App',
   data: function () {
     return {
+      wallets: [],
+      selectWallet: '',
       address: '',
       lockScript: undefined,
       lockHash: '',
@@ -93,22 +105,37 @@ export default {
       loading: false,
     }
   },
+  mounted: async function () {
+    this.wallets = await validWallets()
+  },
   methods: {
     reload: async function () {
-      const authToken = window.localStorage.getItem('authToken')
-      if (!authToken) {
-        console.error('No auth token')
-        return
-      }
       this.loading = true
+      let addresses = []
       try {
-        const addresses = (await queryAddresses(authToken)).addresses
+        if (this.selectWallet === 'Synapse') {
+          const { data } = await window.ckb.getAddressInfo()
+          addresses = [
+            {
+              ...data,
+              address: pubkeyToAddress(hexToBytes(data.publicKey)),
+              lockScript: data.script,
+            },
+          ]
+        } else {
+          const authToken = window.localStorage.getItem('authToken')
+          if (!authToken) {
+            console.error('No auth token')
+            return
+          }
+          addresses = (await queryAddresses(authToken)).addresses
+        }
         if (addresses && addresses.length > 0) {
           this.address = addresses[0].address
           this.lockScript = addresses[0].lockScript
           this.lockHash = addresses[0].lockHash
           const lockArgs = addresses[0].lockScript.args
-          const cells = await getCells(lockArgs)
+          const cells = await getCells(this.selectWallet, lockArgs)
           this.loading = false
           if (cells && cells.length > 0) {
             this.summary = getSummary(cells)
@@ -116,20 +143,12 @@ export default {
             this.emptyCells = emptyCells
             this.filledCells = filledCells
           }
+        } else {
+          this.loading = false
         }
       } catch (error) {
         console.error(error)
         this.loading = false
-      }
-    },
-
-    getAuth: async function () {
-      try {
-        const token = await requestAuth('Simplest DApp')
-        window.localStorage.setItem('authToken', token)
-        await this.reload()
-      } catch (error) {
-        console.error(error)
       }
     },
 
@@ -230,7 +249,7 @@ export default {
         console.error('No auth token')
         return
       }
-      await signAndSendTransaction(rawTx, authToken, this.lockHash)
+      await signAndSendTransaction(this.selectWallet, rawTx, authToken, this.lockHash)
       this.showModel = false
     },
   },
@@ -268,6 +287,21 @@ a {
   border-radius: 2px;
   border: solid 1px #cccccc;
   padding: 8px 0;
+}
+
+.wallets {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.wallet {
+  display: flex;
+}
+
+.wallet input {
+  width: auto;
+  height: 30px;
 }
 
 .auth {
